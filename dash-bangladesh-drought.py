@@ -5,7 +5,8 @@ import numpy as np
 import dash
 from dash import dcc
 from dash import html
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, State
+import dash_auth
 import plotly.express as px
 from dash import dash_table
 from dash_extensions import Download
@@ -23,11 +24,22 @@ years = list(map(str, range(1981, 2019)))
 dekad_dates = 'dekaddates.png'
 encoded_dekad_dates = base64.b64encode(open(dekad_dates, 'rb').read())
 
+#Add authentication my app
+VALID_USERNAME_PASSWORD_PAIRS = {
+    'bangladesh_project': 'drought_cover'
+}
+
+
 # Create the dash application
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 server = app.server
+
+auth = dash_auth.BasicAuth(
+    app,
+    VALID_USERNAME_PASSWORD_PAIRS
+)
 
 colors = {
     'background': '#ebebeb',
@@ -155,7 +167,7 @@ app.layout = html.Div([
                 html.Div(dcc.Dropdown(id='location',
                                       options=[{'label': 'Birganj', 'value': 'Birganj'},
                                                {'label': 'Sherpur', 'value': 'Sherpur'}],
-                                      value='Birganj'))
+                                      value='Sherpur'))
             ]),
 
             html.Div(children=[
@@ -220,7 +232,8 @@ app.layout = html.Div([
                 html.Label(style={"font-weight": "bold", 'color': colors['subheadingsText']},
                            children=["Reported Bad Years for selected location"]),
                 html.Div([
-                    dash_table.DataTable(id='bad-years')
+                    dash_table.DataTable(id='bad-years', style_cell={ 'border': '1px solid grey' }, style_data={ 'color': 'black' },
+                                         style_header={ 'border': '1px solid grey', 'fontWeight':'bold' })
                 ])
             ]),
 
@@ -243,18 +256,20 @@ app.layout = html.Div([
                     html.Br(),
                     html.Label(style={"font-weight": "bold", 'color': colors['subheadingsText']},
                                children=["Triggers and Exits"]),
-                    html.Div([dash_table.DataTable(id='trig-exit')])
+                    html.Div([dash_table.DataTable(id='trig-exit', style_cell={ 'border': '1px solid grey' }, style_data={ 'color': 'black' },
+                                                   style_header={ 'border': '1px solid grey', 'fontWeight':'bold' })])
                 ], style={'display': 'inline-block', 'width': '50%'}),
                 html.Div(children=[
                     html.Br(),
                     html.Label(style={"font-weight": "bold", 'color': colors['subheadingsText']},
                                children=["Pure Risk Premium"]),
-                    html.Div([dash_table.DataTable(id='premium')])
-                ], style={'display': 'inline-block', 'width': '50%'})
-            ], style={'display': 'flex'})
-        ])
+                    html.Div([dash_table.DataTable(id='premium', style_cell={ 'border': '1px solid grey' }, style_data={ 'color': 'black' },
+                                                   style_header={ 'border': '1px solid grey', 'fontWeight':'bold' })])
+                ], style={'display': 'inline-block', 'width': '50%', 'margin-left': '50px'})
+            ], style={'display': 'flex', 'flex-direction': 'row', 'margin':'auto'})
+        ], style={'margin-left': '100px'})
     ], style={'display': 'flex'})
-], style={'backgroundColor': colors['background']})
+], style={'backgroundColor': colors['background'], 'margin':'auto'})
 
 
 #App callbacks
@@ -390,7 +405,7 @@ def bangladesh_wii_analysis(location, frequency, early_window, late_window, earl
     read_bad_years = sitetable.iloc[0, 1:].to_frame().transpose() if location == "Birganj" else sitetable.iloc[1,
                                                                                                 1:].to_frame().transpose()
     read_bad_years = read_bad_years.dropna(axis=1, how='any')
-    read_bad_years.iloc[0, 5] = read_bad_years.iloc[0, 5].astype(int)
+    read_bad_years = read_bad_years.astype(int)
 
     for i in range(len(read_bad_years.columns)):
         BadYears.loc[0, read_bad_years.iloc[:, i].astype(str)] = 1
@@ -524,14 +539,14 @@ def bangladesh_wii_analysis(location, frequency, early_window, late_window, earl
             ]
 
 @app.callback([Output("download", "data")],
-              [Input('location', 'value'),
-               Input('freq', 'value'),
-               Input('Early', 'value'),
-               Input('Late', 'value'),
-               Input('early_wgt', 'value'),
-               Input('late_wgt', 'value'),
-               Input("btn", "n_clicks")],
-              prevent_initial_call=True)
+              [Input("btn", "n_clicks")],
+              [State('location', 'value'),
+               State('freq', 'value'),
+               State('Early', 'value'),
+               State('Late', 'value'),
+               State('early_wgt', 'value'),
+               State('late_wgt', 'value')])
+               #prevent_initial_call=True)
 def bangladesh_download_analysis(location, frequency, early_window, late_window, early_wgt, late_wgt, n_nlicks):
     location, frequency, early_window, late_window = location, frequency, early_window, late_window
     early_weight, late_weight = early_wgt, late_wgt
@@ -557,10 +572,9 @@ def bangladesh_download_analysis(location, frequency, early_window, late_window,
     # Bad Years
     BadYears = pd.DataFrame(0, index=[0], columns=years)
 
-    read_bad_years = sitetable.iloc[0, 1:].to_frame().transpose() if location == "Birganj" else sitetable.iloc[1,
-                                                                                                1:].to_frame().transpose()
+    read_bad_years = sitetable.iloc[0, 1:].to_frame().transpose() if location == "Birganj" else sitetable.iloc[1, 1:-1].to_frame().transpose()
     read_bad_years = read_bad_years.dropna(axis=1, how='any')
-    read_bad_years.iloc[0, 5] = read_bad_years.iloc[0, 5].astype(int)
+    read_bad_years = read_bad_years.astype(int)
 
     for i in range(len(read_bad_years.columns)):
         BadYears.loc[0, read_bad_years.iloc[:, i].astype(str)] = 1
@@ -577,4 +591,5 @@ def bangladesh_download_analysis(location, frequency, early_window, late_window,
 #Run the app
 if __name__ == '__main__':
     app.run_server()
+
 
