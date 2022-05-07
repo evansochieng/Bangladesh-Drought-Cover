@@ -1,0 +1,1 @@
+web: gunicorn dash-bangladesh-drought:server
